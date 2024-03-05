@@ -89,15 +89,14 @@ impl TreeTablesApp {
 }
 
 trait ExpandButton {
-    fn expand_button(&mut self, expanded: &mut bool, enabled: bool) -> Response;
+    fn expand_button(&mut self, expanded: &mut bool) -> Response;
 }
 
 impl ExpandButton for Ui {
-    fn expand_button(&mut self, expanded: &mut bool, enabled: bool) -> Response {
+    fn expand_button(&mut self, expanded: &mut bool) -> Response {
         let symbol = if *expanded { "⮩" } else { "➡" };
-        // self.toggle_value(expanded, symbol)
 
-        let mut response = self.add_enabled(enabled, egui::SelectableLabel::new(*expanded, symbol));
+        let mut response = self.add_enabled(true, egui::SelectableLabel::new(*expanded, symbol));
         if response.clicked() {
             *expanded = !*expanded;
             response.mark_changed();
@@ -145,10 +144,16 @@ impl eframe::App for TreeTablesApp {
                     ui.label("");
                     ui.label("Materialkosten (€)");
                     ui.label("Arbeitszeit (Std.)");
+                    ui.horizontal(|ui| {
+                        ui.add_space(20.0);
+                        if ui.button("+").clicked() {
+                            // TODO: Add new column!
+                        }
+                    });
                     ui.end_row();
 
                     ui.horizontal(|ui| {
-                        ui.expand_button(&mut self.expanded[0], true);
+                        ui.expand_button(&mut self.expanded[0]);
                         ui.label("∑:");
                     });
                     let price_sum = self.price[0]
@@ -168,7 +173,7 @@ impl eframe::App for TreeTablesApp {
                     if self.expanded[0] {
                         ui.horizontal(|ui| {
                             ui.add_space(10.0);
-                            ui.expand_button(&mut self.expanded[1], true);
+                            ui.expand_button(&mut self.expanded[1]);
                             ui.label("Foo:");
                         });
                         ui.horizontal(|ui| {
@@ -181,12 +186,15 @@ impl eframe::App for TreeTablesApp {
                             let sum = self.hours[0] + self.hours[1] + self.hours[2];
                             ui.label(format!("{sum} Std."));
                         });
+                        if ui.button("🗑").clicked() {
+                            //TOOD: Remove element!
+                        }
                         ui.end_row();
 
                         if self.expanded[1] {
                             ui.horizontal(|ui| {
                                 ui.add_space(20.0);
-                                ui.expand_button(&mut self.expanded[2], false);
+                                ui.expand_button(&mut self.expanded[2]);
                                 ui.label("C:");
                             });
                             ui.horizontal(|ui| {
@@ -205,11 +213,14 @@ impl eframe::App for TreeTablesApp {
                                         .suffix(" Std."),
                                 );
                             });
+                            if ui.button("🗑").clicked() {
+                                //TOOD: Remove element!
+                            }
                             ui.end_row();
 
                             ui.horizontal(|ui| {
                                 ui.add_space(20.0);
-                                ui.expand_button(&mut self.expanded[3], false);
+                                ui.expand_button(&mut self.expanded[3]);
                                 ui.label("Rust:");
                             });
                             ui.horizontal(|ui| {
@@ -228,11 +239,14 @@ impl eframe::App for TreeTablesApp {
                                         .suffix(" Std."),
                                 );
                             });
+                            if ui.button("🗑").clicked() {
+                                //TOOD: Remove element!
+                            }
                             ui.end_row();
 
                             ui.horizontal(|ui| {
                                 ui.add_space(20.0);
-                                ui.expand_button(&mut self.expanded[4], false);
+                                ui.expand_button(&mut self.expanded[4]);
                                 ui.label("C++:");
                             });
                             ui.horizontal(|ui| {
@@ -251,12 +265,23 @@ impl eframe::App for TreeTablesApp {
                                         .suffix(" Std."),
                                 );
                             });
+                            if ui.button("🗑").clicked() {
+                                //TOOD: Remove element!
+                            }
+                            ui.end_row();
+
+                            ui.horizontal(|ui| {
+                                ui.add_space(20.0);
+                                if ui.button("+").clicked() {
+                                    // TODO: Add new element at same level!
+                                }
+                            });
                             ui.end_row();
                         }
 
                         ui.horizontal(|ui| {
                             ui.add_space(10.0);
-                            ui.expand_button(&mut self.expanded[5], false);
+                            ui.expand_button(&mut self.expanded[5]);
                             ui.label("Java:");
                         });
                         ui.horizontal(|ui| {
@@ -275,11 +300,24 @@ impl eframe::App for TreeTablesApp {
                                     .suffix(" Std."),
                             );
                         });
+                        if ui.button("🗑").clicked() {
+                            //TOOD: Remove element!
+                        }
                         ui.end_row();
+
+                        if self.expanded[5] {
+                            ui.horizontal(|ui| {
+                                ui.add_space(20.0);
+                                if ui.button("+").clicked() {
+                                    // TODO: Add new deeper element!
+                                }
+                            });
+                            ui.end_row();
+                        }
 
                         ui.horizontal(|ui| {
                             ui.add_space(10.0);
-                            ui.expand_button(&mut self.expanded[6], false);
+                            ui.expand_button(&mut self.expanded[6]);
                             ui.label("JavaScript:");
                         });
                         ui.horizontal(|ui| {
@@ -297,6 +335,17 @@ impl eframe::App for TreeTablesApp {
                                     .speed(1.0)
                                     .suffix(" Std."),
                             );
+                        });
+                        if ui.button("🗑").clicked() {
+                            //TOOD: Remove element!
+                        }
+                        ui.end_row();
+
+                        ui.horizontal(|ui| {
+                            ui.add_space(10.0);
+                            if ui.button("+").clicked() {
+                                // TODO: Add new element at same level!
+                            }
                         });
                         ui.end_row();
                     }
