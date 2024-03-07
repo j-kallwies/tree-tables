@@ -8,6 +8,9 @@ pub struct ColumnConfig {
     id: String,
     caption: String,
     unit: String,
+
+    edit_caption: bool,
+    edit_unit: bool,
 }
 
 enum Action {
@@ -145,9 +148,7 @@ impl RowData {
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
 pub struct TreeTablesApp {
-    #[serde(skip)]
     column_configs: Vec<ColumnConfig>,
-
     root_row: RowData,
 }
 
@@ -159,11 +160,15 @@ impl Default for TreeTablesApp {
                     id: "cost".to_owned(),
                     caption: "Materialkosten".to_owned(),
                     unit: "€".to_owned(),
+                    edit_caption: false,
+                    edit_unit: false,
                 },
                 ColumnConfig {
                     id: "hours".to_owned(),
                     caption: "Arbeitszeit".to_owned(),
                     unit: "h".to_owned(),
+                    edit_caption: false,
+                    edit_unit: false,
                 },
             ],
 
@@ -304,10 +309,31 @@ impl eframe::App for TreeTablesApp {
                     ui.label("");
 
                     // HEADLINE
-                    for cfg in self.column_configs.iter() {
-                        let caption = &cfg.caption;
-                        let unit = &cfg.unit;
-                        ui.label(format!("{caption} ({unit})"));
+                    for cfg in self.column_configs.iter_mut() {
+                        let caption = cfg.caption.clone();
+                        let unit = cfg.unit.clone();
+                        ui.horizontal(|ui| {
+                            if !cfg.edit_caption {
+                                if ui.label(caption).double_clicked() {
+                                    cfg.edit_caption = true;
+                                }
+                            } else {
+                                if ui.text_edit_singleline(&mut cfg.caption).lost_focus() {
+                                    if !cfg.caption.is_empty() {
+                                        cfg.edit_caption = false;
+                                    }
+                                }
+                            }
+                            if !cfg.edit_unit {
+                                if ui.label(format!("({unit})")).double_clicked() {
+                                    cfg.edit_unit = true;
+                                }
+                            } else {
+                                if ui.text_edit_singleline(&mut cfg.unit).lost_focus() {
+                                    cfg.edit_unit = false;
+                                }
+                            }
+                        });
                     }
                     ui.horizontal(|ui| {
                         ui.add_space(20.0);
