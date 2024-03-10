@@ -1,6 +1,8 @@
 use egui::debug_text::print;
 use egui::*;
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::prelude::*;
 use std::vec::Vec;
 
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -308,6 +310,39 @@ impl eframe::App for TreeTablesApp {
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
+            ui.horizontal(|ui| {
+                if ui.button("Open").clicked() {
+                    if let Some(path) = rfd::FileDialog::new().pick_file() {
+                        let file_data = std::fs::read_to_string(path.display().to_string())
+                            .expect("Should have been able to read the file");
+
+                        println!("{}", file_data);
+
+                        let json_state: TreeTablesApp = serde_json::from_str(file_data.as_str())
+                            .expect("JSON data is corrupted.");
+
+                        self.root_row = json_state.root_row;
+                        self.column_configs = json_state.column_configs;
+                        self.title_text = json_state.title_text;
+                    }
+                }
+
+                if ui.button("Save as").clicked() {
+                    if let Some(path) = rfd::FileDialog::new().save_file() {
+                        let file_path = path.display().to_string();
+
+                        dbg!(&file_path);
+
+                        if let Ok(mut file) = File::create(file_path) {
+                            println!("{}", serde_json::to_string(&self).unwrap());
+
+                            let res = file.write(serde_json::to_string(&self).unwrap().as_bytes());
+                            dbg!(res);
+                        }
+                    }
+                }
+            });
+
             egui::ScrollArea::vertical().show(ui, |ui| {
                 // The central panel the region left after adding TopPanel's and SidePanel's
                 if self.edit_title_text == false {
