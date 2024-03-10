@@ -18,7 +18,7 @@ fn main() -> eframe::Result<()> {
         ..Default::default()
     };
     eframe::run_native(
-        "eframe template",
+        "Tree-Tables",
         native_options,
         Box::new(|cc| Box::new(tree_tables::TreeTablesApp::new(cc))),
     )
