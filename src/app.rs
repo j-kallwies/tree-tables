@@ -315,8 +315,6 @@ impl eframe::App for TreeTablesApp {
                         let file_data = std::fs::read_to_string(path.display().to_string())
                             .expect("Should have been able to read the file");
 
-                        println!("{}", file_data);
-
                         let json_state: TreeTablesApp = serde_json::from_str(file_data.as_str())
                             .expect("JSON data is corrupted.");
 
@@ -333,8 +331,6 @@ impl eframe::App for TreeTablesApp {
                         dbg!(&file_path);
 
                         if let Ok(mut file) = File::create(file_path) {
-                            println!("{}", serde_json::to_string(&self).unwrap());
-
                             let res = file.write(serde_json::to_string(&self).unwrap().as_bytes());
                             dbg!(res);
                         }
