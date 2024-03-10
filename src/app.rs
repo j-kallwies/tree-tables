@@ -148,13 +148,20 @@ impl RowData {
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
 pub struct TreeTablesApp {
+    title_text: String,
     column_configs: Vec<ColumnConfig>,
     root_row: RowData,
+
+    #[serde(skip)]
+    edit_title_text: bool,
 }
 
 impl Default for TreeTablesApp {
     fn default() -> Self {
         Self {
+            title_text: "Tree Tables".to_owned(),
+            edit_title_text: false,
+
             column_configs: vec![
                 ColumnConfig {
                     id: "cost".to_owned(),
@@ -303,7 +310,16 @@ impl eframe::App for TreeTablesApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             egui::ScrollArea::vertical().show(ui, |ui| {
                 // The central panel the region left after adding TopPanel's and SidePanel's
-                ui.heading("Tree Tables");
+                if self.edit_title_text == false {
+                    if ui.heading(self.title_text.clone()).double_clicked() {
+                        self.edit_title_text = true;
+                    }
+                } else {
+                    let resp = ui.text_edit_singleline(&mut self.title_text);
+                    if resp.lost_focus() || resp.clicked_elsewhere() {
+                        self.edit_title_text = false;
+                    }
+                }
 
                 egui::Grid::new("table").show(ui, |ui| {
                     ui.label("");
