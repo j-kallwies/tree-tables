@@ -4,6 +4,8 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::vec::Vec;
 
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct ColumnConfig {
     id: String,
@@ -394,8 +396,13 @@ impl eframe::App for TreeTablesApp {
 
                 ui.separator();
 
-                ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
+                ui.with_layout(egui::Layout::bottom_up(egui::Align::RIGHT), |ui| {
                     egui::warn_if_debug_build(ui);
+                    ui.label(
+                        RichText::new(format!("tree-tables v{VERSION}"))
+                            .text_style(TextStyle::Small),
+                    );
+                    ui.separator();
                 });
             });
         });
