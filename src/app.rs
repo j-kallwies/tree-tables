@@ -381,12 +381,12 @@ impl eframe::App for TreeTablesApp {
                             }
                         });
                     }
-                    ui.horizontal(|ui| {
-                        ui.add_space(20.0);
-                        if ui.button("+").clicked() {
-                            // TODO: Add new column!
-                        }
-                    });
+                    // ui.horizontal(|ui| {
+                    //     ui.add_space(20.0);
+                    //     if ui.button("+").clicked() {
+                    //         // TODO: Add new column!
+                    //     }
+                    // });
                     ui.end_row();
 
                     self.root_row.render(ui, &self.column_configs, 0);
