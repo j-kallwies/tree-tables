@@ -1,6 +1,6 @@
 [package]
 name = "tree_tables"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Jan Kallwies <jan@kallwies.com>"]
 edition = "2021"
 
@@ -15,6 +15,7 @@ eframe = { version = "0.26.0", default-features = false, features = [
 ] }
 rfd = "0.14.0"
 log = "0.4"
+egui-keybind = "0.2.9"
 
 # You only need serde if you want app persistence:
 serde = { version = "1", features = ["derive"] }

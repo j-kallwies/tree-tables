@@ -1,4 +1,5 @@
 use egui::*;
+use egui_keybind::{Bind, Keybind, Shortcut};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
@@ -17,6 +18,7 @@ pub struct ColumnConfig {
 }
 
 enum Action {
+    Modified,
     Remove,
 }
 
@@ -86,11 +88,16 @@ impl RowData {
 
             ui.add_space(10.0 * indent_level as f32);
             if leaf_node {
-                ui.add(
-                    egui::DragValue::new(self.col_data.get_mut(col_id).unwrap())
-                        .speed(1.0)
-                        .suffix(format!(" {unit}")),
-                );
+                if ui
+                    .add(
+                        egui::DragValue::new(self.col_data.get_mut(col_id).unwrap())
+                            .speed(1.0)
+                            .suffix(format!(" {unit}")),
+                    )
+                    .changed()
+                {
+                    action = Some(Action::Modified);
+                }
             } else {
                 ui.label(format!("{value} {unit}"));
             }
@@ -106,12 +113,16 @@ impl RowData {
             for (i, child) in self.children.iter_mut().enumerate() {
                 match child.render(ui, column_configs, indent_level + 1) {
                     Some(Action::Remove) => remove_idx = Some(i),
+                    Some(Action::Modified) => action = Some(Action::Modified),
                     None => (),
                 }
             }
 
             if let Some(i) = remove_idx {
                 self.children.remove(i);
+
+                // Removing a children, means that something changed!
+                action = Some(Action::Modified);
             }
 
             // Button to add a new element at the same level
@@ -136,6 +147,8 @@ impl RowData {
                         expanded: false,
                         edit_name: true,
                     });
+
+                    action = Some(Action::Modified);
                 }
             });
             ui.end_row();
@@ -145,102 +158,92 @@ impl RowData {
     }
 }
 
+#[derive(serde::Deserialize, serde::Serialize)]
+struct TreeTable {
+    title_text: String,
+    column_configs: Vec<ColumnConfig>,
+    root_row: RowData,
+}
+
+impl TreeTable {
+    fn save_to_file(&self, file_path: &str) {
+        if let Ok(mut file) = File::create(file_path) {
+            let res = file.write(serde_json::to_string(&self).unwrap().as_bytes());
+        }
+    }
+}
+
 // ----------------------------------------------------------------------------
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
 pub struct TreeTablesApp {
-    title_text: String,
-    column_configs: Vec<ColumnConfig>,
-    root_row: RowData,
+    #[serde(skip)]
+    tree_table: TreeTable,
+
+    #[serde(skip)]
+    filename: String,
+
+    #[serde(skip)]
+    file_modified: bool,
 
     #[serde(skip)]
     edit_title_text: bool,
+
+    #[serde(skip)] // TODO: Implement serialization
+    save_shortcut: Shortcut,
 }
 
 impl Default for TreeTablesApp {
     fn default() -> Self {
         Self {
-            title_text: "Tree Tables".to_owned(),
-            edit_title_text: false,
+            filename: "unnamed.tt".to_owned(),
+            file_modified: true,
+            tree_table: TreeTable {
+                title_text: "Tree Tables".to_owned(),
+                column_configs: vec![
+                    ColumnConfig {
+                        id: "cost".to_owned(),
+                        caption: "Materialkosten".to_owned(),
+                        unit: "€".to_owned(),
+                        edit_caption: false,
+                        edit_unit: false,
+                    },
+                    ColumnConfig {
+                        id: "hours".to_owned(),
+                        caption: "Arbeitszeit".to_owned(),
+                        unit: "h".to_owned(),
+                        edit_caption: false,
+                        edit_unit: false,
+                    },
+                ],
 
-            column_configs: vec![
-                ColumnConfig {
-                    id: "cost".to_owned(),
-                    caption: "Materialkosten".to_owned(),
-                    unit: "€".to_owned(),
-                    edit_caption: false,
-                    edit_unit: false,
-                },
-                ColumnConfig {
-                    id: "hours".to_owned(),
-                    caption: "Arbeitszeit".to_owned(),
-                    unit: "h".to_owned(),
-                    edit_caption: false,
-                    edit_unit: false,
-                },
-            ],
-
-            root_row: RowData {
-                name: "∑".to_owned(),
-                col_data: HashMap::from([("hours".to_owned(), 5.0), ("cost".to_owned(), 10.0)]),
-                children: vec![
-                    RowData {
+                root_row: RowData {
+                    name: "∑".to_owned(),
+                    col_data: HashMap::from([]),
+                    children: vec![RowData {
                         name: "A".to_owned(),
                         col_data: HashMap::from([
-                            ("hours".to_owned(), 1.0),
-                            ("cost".to_owned(), 8.0),
-                        ]),
-                        children: vec![
-                            RowData {
-                                name: "a".to_owned(),
-                                col_data: HashMap::from([
-                                    ("hours".to_owned(), 1.0),
-                                    ("cost".to_owned(), 8.0),
-                                ]),
-                                children: vec![],
-                                expanded: false,
-                                edit_name: false,
-                            },
-                            RowData {
-                                name: "b".to_owned(),
-                                col_data: HashMap::from([
-                                    ("hours".to_owned(), 1.0),
-                                    ("cost".to_owned(), 8.0),
-                                ]),
-                                children: vec![],
-                                expanded: false,
-                                edit_name: false,
-                            },
-                            RowData {
-                                name: "c".to_owned(),
-                                col_data: HashMap::from([
-                                    ("hours".to_owned(), 1.0),
-                                    ("cost".to_owned(), 8.0),
-                                ]),
-                                children: vec![],
-                                expanded: false,
-                                edit_name: false,
-                            },
-                        ],
-                        expanded: false,
-                        edit_name: false,
-                    },
-                    RowData {
-                        name: "B".to_owned(),
-                        col_data: HashMap::from([
-                            ("hours".to_owned(), 1.0),
-                            ("cost".to_owned(), 8.0),
+                            ("hours".to_owned(), 0.0),
+                            ("cost".to_owned(), 0.0),
                         ]),
                         children: vec![],
                         expanded: false,
                         edit_name: false,
-                    },
-                ],
-                expanded: false,
-                edit_name: false,
+                    }],
+                    expanded: false,
+                    edit_name: false,
+                },
             },
+            edit_title_text: false,
+            save_shortcut: Shortcut::new(
+                Some(egui::KeyboardShortcut::new(
+                    egui::Modifiers::COMMAND,
+                    egui::Key::S,
+                )),
+                None,
+            ),
         }
     }
 }
@@ -289,7 +292,9 @@ impl eframe::App for TreeTablesApp {
         // Put your widgets into a `SidePanel`, `TopBottomPanel`, `CentralPanel`, `Window` or `Area`.
         // For inspiration and more examples, go to https://emilk.github.io/egui
 
-        self.root_row.update(&self.column_configs);
+        self.tree_table
+            .root_row
+            .update(&self.tree_table.column_configs);
 
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             // The top panel is often a good place for a menu bar:
@@ -311,31 +316,56 @@ impl eframe::App for TreeTablesApp {
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
+            // ui.label("A simple keybind:");
+            // let response = ui.add(Keybind::new(&mut self.save_shortcut, "example_keybind"));
+            // if response.changed() {
+            //     println!("Save shortcut changed!");
+            // }
+
+            // let keybind_text = self.save_shortcut.format(&egui::ModifierNames::NAMES, true);
+            if ctx.input_mut(|i| self.save_shortcut.pressed(i)) {
+                self.tree_table.save_to_file(self.filename.as_str());
+                self.file_modified = false;
+            }
+
+            ui.label(
+                egui::RichText::new(format!(
+                    "{}{}",
+                    self.filename,
+                    if self.file_modified {
+                        "*".to_owned()
+                    } else {
+                        "".to_owned()
+                    }
+                ))
+                .monospace(),
+            );
+
             ui.horizontal(|ui| {
                 if ui.button("Open").clicked() {
                     if let Some(path) = rfd::FileDialog::new().pick_file() {
                         let file_data = std::fs::read_to_string(path.display().to_string())
                             .expect("Should have been able to read the file");
 
-                        let json_state: TreeTablesApp = serde_json::from_str(file_data.as_str())
+                        let json_state: TreeTable = serde_json::from_str(file_data.as_str())
                             .expect("JSON data is corrupted.");
 
-                        self.root_row = json_state.root_row;
-                        self.column_configs = json_state.column_configs;
-                        self.title_text = json_state.title_text;
+                        self.tree_table = json_state;
+                        self.filename = path.display().to_string();
+                        self.file_modified = false;
                     }
+                }
+
+                if ui.button("Save").clicked() {
+                    self.tree_table.save_to_file(self.filename.as_str());
+                    self.file_modified = false;
                 }
 
                 if ui.button("Save as").clicked() {
                     if let Some(path) = rfd::FileDialog::new().save_file() {
-                        let file_path = path.display().to_string();
-
-                        dbg!(&file_path);
-
-                        if let Ok(mut file) = File::create(file_path) {
-                            let res = file.write(serde_json::to_string(&self).unwrap().as_bytes());
-                            dbg!(res);
-                        }
+                        self.filename = path.display().to_string();
+                        self.tree_table.save_to_file(self.filename.as_str());
+                        self.file_modified = false;
                     }
                 }
             });
@@ -343,11 +373,14 @@ impl eframe::App for TreeTablesApp {
             egui::ScrollArea::vertical().show(ui, |ui| {
                 // The central panel the region left after adding TopPanel's and SidePanel's
                 if self.edit_title_text == false {
-                    if ui.heading(self.title_text.clone()).double_clicked() {
+                    if ui
+                        .heading(self.tree_table.title_text.clone())
+                        .double_clicked()
+                    {
                         self.edit_title_text = true;
                     }
                 } else {
-                    let resp = ui.text_edit_singleline(&mut self.title_text);
+                    let resp = ui.text_edit_singleline(&mut self.tree_table.title_text);
                     if resp.lost_focus() || resp.clicked_elsewhere() {
                         self.edit_title_text = false;
                     }
@@ -357,7 +390,7 @@ impl eframe::App for TreeTablesApp {
                     ui.label("");
 
                     // HEADLINE
-                    for cfg in self.column_configs.iter_mut() {
+                    for cfg in self.tree_table.column_configs.iter_mut() {
                         let caption = cfg.caption.clone();
                         let unit = cfg.unit.clone();
                         ui.horizontal(|ui| {
@@ -391,7 +424,17 @@ impl eframe::App for TreeTablesApp {
                     // });
                     ui.end_row();
 
-                    self.root_row.render(ui, &self.column_configs, 0);
+                    match self
+                        .tree_table
+                        .root_row
+                        .render(ui, &self.tree_table.column_configs, 0)
+                    {
+                        Some(Action::Modified) => {
+                            self.file_modified = true;
+                        }
+                        Some(Action::Remove) => {}
+                        None => {}
+                    }
                 });
 
                 ui.separator();
