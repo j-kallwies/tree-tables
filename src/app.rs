@@ -4,17 +4,15 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
 use std::vec::Vec;
+use uuid::Uuid;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-#[derive(serde::Deserialize, serde::Serialize)]
+#[derive(serde::Deserialize, serde::Serialize, Debug)]
 pub struct ColumnConfig {
     id: String,
     caption: String,
     unit: String,
-
-    edit_caption: bool,
-    edit_unit: bool,
 }
 
 enum Action {
@@ -193,6 +191,9 @@ pub struct TreeTablesApp {
 
     #[serde(skip)] // TODO: Implement serialization
     save_shortcut: Shortcut,
+
+    #[serde(skip)]
+    edit_column_idx: Option<usize>,
 }
 
 impl Default for TreeTablesApp {
@@ -204,18 +205,14 @@ impl Default for TreeTablesApp {
                 title_text: "Tree Tables".to_owned(),
                 column_configs: vec![
                     ColumnConfig {
-                        id: "cost".to_owned(),
+                        id: "2387c84a-2c68-405e-a342-d94a1dde6408".to_owned(),
                         caption: "Materialkosten".to_owned(),
                         unit: "€".to_owned(),
-                        edit_caption: false,
-                        edit_unit: false,
                     },
                     ColumnConfig {
-                        id: "hours".to_owned(),
+                        id: "94869fe6-c736-4c88-be7f-8084679d78fc".to_owned(),
                         caption: "Arbeitszeit".to_owned(),
                         unit: "h".to_owned(),
-                        edit_caption: false,
-                        edit_unit: false,
                     },
                 ],
 
@@ -244,6 +241,7 @@ impl Default for TreeTablesApp {
                 )),
                 None,
             ),
+            edit_column_idx: None,
         }
     }
 }
@@ -390,38 +388,27 @@ impl eframe::App for TreeTablesApp {
                     ui.label("");
 
                     // HEADLINE
-                    for cfg in self.tree_table.column_configs.iter_mut() {
+                    for (col_idx, cfg) in self.tree_table.column_configs.iter().enumerate() {
                         let caption = cfg.caption.clone();
                         let unit = cfg.unit.clone();
                         ui.horizontal(|ui| {
-                            if !cfg.edit_caption {
-                                if ui.label(caption).double_clicked() {
-                                    cfg.edit_caption = true;
-                                }
-                            } else {
-                                if ui.text_edit_singleline(&mut cfg.caption).lost_focus() {
-                                    if !cfg.caption.is_empty() {
-                                        cfg.edit_caption = false;
-                                    }
-                                }
-                            }
-                            if !cfg.edit_unit {
-                                if ui.label(format!("({unit})")).double_clicked() {
-                                    cfg.edit_unit = true;
-                                }
-                            } else {
-                                if ui.text_edit_singleline(&mut cfg.unit).lost_focus() {
-                                    cfg.edit_unit = false;
-                                }
+                            if ui.label(format!("{caption} ({unit})")).double_clicked() {
+                                self.edit_column_idx = Some(col_idx);
                             }
                         });
                     }
-                    // ui.horizontal(|ui| {
-                    //     ui.add_space(20.0);
-                    //     if ui.button("+").clicked() {
-                    //         // TODO: Add new column!
-                    //     }
-                    // });
+                    ui.horizontal(|ui| {
+                        ui.add_space(20.0);
+                        if ui.button("+").clicked() {
+                            self.edit_column_idx = Some(self.tree_table.column_configs.len());
+
+                            self.tree_table.column_configs.push(ColumnConfig {
+                                id: Uuid::new_v4().to_string(),
+                                caption: "".to_owned(),
+                                unit: "€".to_owned(),
+                            });
+                        }
+                    });
                     ui.end_row();
 
                     match self
@@ -449,5 +436,69 @@ impl eframe::App for TreeTablesApp {
                 });
             });
         });
+
+        if self.edit_column_idx.is_some() {
+            egui::Window::new("Edit column").show(ctx, |ui| {
+                egui::Grid::new("edit_column_table").show(ui, |ui| {
+                    // ui.label("ID");
+                    // ui.add_sized(
+                    //     [140.0, 20.0],
+                    //     egui::TextEdit::singleline(
+                    //         &mut self
+                    //             .tree_table
+                    //             .column_configs
+                    //             .get_mut(self.edit_column_idx.unwrap())
+                    //             .unwrap()
+                    //             .id,
+                    //     ),
+                    // );
+                    // ui.end_row();
+
+                    ui.label("Title");
+                    ui.add_sized(
+                        [140.0, 20.0],
+                        egui::TextEdit::singleline(
+                            &mut self
+                                .tree_table
+                                .column_configs
+                                .get_mut(self.edit_column_idx.unwrap())
+                                .unwrap()
+                                .caption,
+                        ),
+                    );
+                    ui.end_row();
+
+                    ui.label("Unit");
+                    ui.text_edit_singleline(
+                        &mut self
+                            .tree_table
+                            .column_configs
+                            .get_mut(self.edit_column_idx.unwrap())
+                            .unwrap()
+                            .unit,
+                    );
+                    ui.end_row();
+                });
+
+                if ui.button("OK").clicked() {
+                    self.edit_column_idx = None;
+                }
+
+                if ui
+                    .button(RichText::new("🗑").color(egui::Color32::RED))
+                    .clicked()
+                {
+                    // dbg!(&self.tree_table.column_configs);
+
+                    self.tree_table
+                        .column_configs
+                        .remove(self.edit_column_idx.unwrap());
+
+                    // dbg!(&self.tree_table.column_configs);
+
+                    self.edit_column_idx = None;
+                }
+            });
+        }
     }
 }
