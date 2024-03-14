@@ -166,7 +166,7 @@ struct TreeTable {
 impl TreeTable {
     fn save_to_file(&self, file_path: &str) {
         if let Ok(mut file) = File::create(file_path) {
-            let res = file.write(serde_json::to_string(&self).unwrap().as_bytes());
+            let _res = file.write(serde_json::to_string(&self).unwrap().as_bytes());
         }
     }
 }
