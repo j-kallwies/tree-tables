@@ -7,6 +7,7 @@ use std::vec::Vec;
 use uuid::Uuid;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
+const VALID_FILE_EXTENSIONS: [&'static str; 3] = ["tt", "json", "ttree"];
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug)]
 pub enum ColumnType {
@@ -364,7 +365,10 @@ impl eframe::App for TreeTablesApp {
 
             ui.horizontal(|ui| {
                 if ui.button("Open").clicked() {
-                    if let Some(path) = rfd::FileDialog::new().pick_file() {
+                    if let Some(path) = rfd::FileDialog::new()
+                        .add_filter("Tree-Tables", &VALID_FILE_EXTENSIONS)
+                        .pick_file()
+                    {
                         let file_data = std::fs::read_to_string(path.display().to_string())
                             .expect("Should have been able to read the file");
 
@@ -383,7 +387,14 @@ impl eframe::App for TreeTablesApp {
                 }
 
                 if ui.button("Save as").clicked() {
-                    if let Some(path) = rfd::FileDialog::new().save_file() {
+                    if let Some(path) = rfd::FileDialog::new()
+                        .add_filter("Tree-Tables", &VALID_FILE_EXTENSIONS)
+                        .save_file()
+                    {
+                        // Ensure the ".tt" extension
+                        let mut path = path;
+                        path.set_extension("tt");
+
                         self.filename = path.display().to_string();
                         self.tree_table.save_to_file(self.filename.as_str());
                         self.file_modified = false;
