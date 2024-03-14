@@ -114,6 +114,8 @@ impl RowData {
                 ui.label(format!("{value} {unit}"));
             }
         }
+
+        // Remove row button
         if ui.button("🗑").clicked() {
             action = Some(Action::Remove);
         }
