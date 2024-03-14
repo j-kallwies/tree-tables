@@ -208,6 +208,9 @@ pub struct TreeTablesApp {
 
     #[serde(skip)]
     edit_column_idx: Option<usize>,
+
+    #[serde(skip)]
+    close_requested: bool,
 }
 
 impl Default for ColumnConfig {
@@ -266,6 +269,7 @@ impl Default for TreeTablesApp {
                 None,
             ),
             edit_column_idx: None,
+            close_requested: false,
         }
     }
 }
@@ -314,6 +318,16 @@ impl eframe::App for TreeTablesApp {
         // Put your widgets into a `SidePanel`, `TopBottomPanel`, `CentralPanel`, `Window` or `Area`.
         // For inspiration and more examples, go to https://emilk.github.io/egui
 
+        // Show a confirmation dialog when the close event is detected
+        if ctx.input(|i| i.viewport().close_requested()) {
+            egui::CentralPanel::default().show(ctx, |_ui| {
+                if self.file_modified {
+                    ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+                }
+                self.close_requested = true;
+            });
+        }
+
         self.tree_table
             .root_row
             .update(&self.tree_table.column_configs);
@@ -343,6 +357,25 @@ impl eframe::App for TreeTablesApp {
             // if response.changed() {
             //     println!("Save shortcut changed!");
             // }
+
+            if self.close_requested {
+                egui::Window::new("Unsaved changes").show(ctx, |ui| {
+                    ui.label(
+                        "You still have unsaved changes. Do you want to save them before you quit?",
+                    );
+                    ui.horizontal(|ui| {
+                        if ui.button("Yes, save!").clicked() {
+                            self.tree_table.save_to_file(self.filename.as_str());
+                            self.file_modified = false;
+                            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                        }
+                        if ui.button("No, revert all changes and quit!").clicked() {
+                            self.file_modified = false;
+                            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                        }
+                    });
+                });
+            };
 
             // let keybind_text = self.save_shortcut.format(&egui::ModifierNames::NAMES, true);
             if ctx.input_mut(|i| self.save_shortcut.pressed(i)) {
