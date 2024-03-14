@@ -9,6 +9,7 @@ use uuid::Uuid;
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
+#[serde(default)] // if we add new fields, give them default values when deserializing old state
 pub struct ColumnConfig {
     id: String,
     caption: String,
@@ -198,6 +199,16 @@ pub struct TreeTablesApp {
 
     #[serde(skip)]
     edit_column_idx: Option<usize>,
+}
+
+impl Default for ColumnConfig {
+    fn default() -> ColumnConfig {
+        ColumnConfig {
+            id: Uuid::new_v4().to_string(),
+            caption: "".to_owned(),
+            unit: "€".to_owned(),
+        }
+    }
 }
 
 impl Default for TreeTablesApp {
@@ -403,11 +414,7 @@ impl eframe::App for TreeTablesApp {
                         if ui.button("+").clicked() {
                             self.edit_column_idx = Some(self.tree_table.column_configs.len());
 
-                            self.tree_table.column_configs.push(ColumnConfig {
-                                id: Uuid::new_v4().to_string(),
-                                caption: "".to_owned(),
-                                unit: "€".to_owned(),
-                            });
+                            self.tree_table.column_configs.push(ColumnConfig::default());
                         }
                     });
                     ui.end_row();
