@@ -84,6 +84,10 @@ impl RowData {
             let value = *self.col_data.get(col_id).unwrap_or(&0.0);
             let unit = col_cfg.unit.clone();
 
+            if self.col_data.get(col_id).is_none() {
+                self.col_data.insert(col_id.clone(), 0.0);
+            }
+
             ui.add_space(10.0 * indent_level as f32);
             if leaf_node {
                 if ui
@@ -221,10 +225,7 @@ impl Default for TreeTablesApp {
                     col_data: HashMap::from([]),
                     children: vec![RowData {
                         name: "A".to_owned(),
-                        col_data: HashMap::from([
-                            ("hours".to_owned(), 0.0),
-                            ("cost".to_owned(), 0.0),
-                        ]),
+                        col_data: HashMap::from([]),
                         children: vec![],
                         expanded: false,
                         edit_name: false,
