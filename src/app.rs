@@ -9,6 +9,38 @@ use uuid::Uuid;
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const VALID_FILE_EXTENSIONS: [&'static str; 3] = ["tt", "json", "ttree"];
 
+fn format_float(mut x: f64, unit: Option<&str>, show_decimal: bool) -> String {
+    if show_decimal == false {
+        x = x.round();
+    }
+
+    let int_part: i64 = x as i64;
+
+    let int_str = int_part
+        .to_string()
+        .as_bytes()
+        .rchunks(3)
+        .rev()
+        .map(std::str::from_utf8)
+        .collect::<Result<Vec<&str>, _>>()
+        .unwrap()
+        .join(".");
+
+    let suffix = if unit.is_some() {
+        " ".to_owned() + unit.unwrap()
+    } else {
+        "".to_owned()
+    };
+
+    if show_decimal == false {
+        return int_str + suffix.as_str();
+    } else {
+        let decimal_part = x - int_part as f64;
+        let decimal_part_int = (decimal_part * 100.0).round() as i64;
+        return int_str + "," + format!("{:02}", decimal_part_int).as_str() + suffix.as_str();
+    }
+}
+
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug)]
 pub enum ColumnType {
     Number,
@@ -68,6 +100,7 @@ impl RowData {
         ui: &mut Ui,
         column_configs: &Vec<ColumnConfig>,
         indent_level: i32,
+        show_decimals: bool,
     ) -> Option<Action> {
         let mut action = None;
 
@@ -104,14 +137,22 @@ impl RowData {
                     .add(
                         egui::DragValue::new(self.col_data.get_mut(col_id).unwrap())
                             .speed(1.0)
-                            .suffix(format!(" {unit}")),
+                            .suffix(format!(" {unit}"))
+                            .custom_formatter(|n, _| format_float(n, None, show_decimals))
+                            .custom_parser(|s| {
+                                let s_cleaned = String::from(s).replace(".", "").replace(",", ".");
+                                return match s_cleaned.parse::<f64>() {
+                                    Ok(x) => Some(x),
+                                    Err(_) => None,
+                                };
+                            }),
                     )
                     .changed()
                 {
                     action = Some(Action::Modified);
                 }
             } else {
-                ui.label(format!("{value} {unit}"));
+                ui.label(format_float(value, Some(unit.as_str()), show_decimals));
             }
         }
 
@@ -125,7 +166,7 @@ impl RowData {
         if self.expanded {
             let mut remove_idx = None;
             for (i, child) in self.children.iter_mut().enumerate() {
-                match child.render(ui, column_configs, indent_level + 1) {
+                match child.render(ui, column_configs, indent_level + 1, show_decimals) {
                     Some(Action::Remove) => remove_idx = Some(i),
                     Some(Action::Modified) => action = Some(Action::Modified),
                     None => (),
@@ -213,6 +254,8 @@ pub struct TreeTablesApp {
 
     #[serde(skip)]
     close_requested: bool,
+
+    show_decimals: bool,
 }
 
 impl Default for ColumnConfig {
@@ -272,6 +315,7 @@ impl Default for TreeTablesApp {
             ),
             edit_column_idx: None,
             close_requested: false,
+            show_decimals: false,
         }
     }
 }
@@ -476,11 +520,12 @@ impl eframe::App for TreeTablesApp {
                     });
                     ui.end_row();
 
-                    match self
-                        .tree_table
-                        .root_row
-                        .render(ui, &self.tree_table.column_configs, 0)
-                    {
+                    match self.tree_table.root_row.render(
+                        ui,
+                        &self.tree_table.column_configs,
+                        0,
+                        self.show_decimals,
+                    ) {
                         Some(Action::Modified) => {
                             self.file_modified = true;
                         }
