@@ -8,12 +8,20 @@ use uuid::Uuid;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug)]
+pub enum ColumnType {
+    Number,
+    Text,
+    Formula,
+}
+
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
 pub struct ColumnConfig {
     id: String,
     caption: String,
     unit: String,
+    col_type: ColumnType,
 }
 
 enum Action {
@@ -207,6 +215,7 @@ impl Default for ColumnConfig {
             id: Uuid::new_v4().to_string(),
             caption: "".to_owned(),
             unit: "€".to_owned(),
+            col_type: ColumnType::Number,
         }
     }
 }
@@ -223,11 +232,13 @@ impl Default for TreeTablesApp {
                         id: "2387c84a-2c68-405e-a342-d94a1dde6408".to_owned(),
                         caption: "Materialkosten".to_owned(),
                         unit: "€".to_owned(),
+                        col_type: ColumnType::Number,
                     },
                     ColumnConfig {
                         id: "94869fe6-c736-4c88-be7f-8084679d78fc".to_owned(),
                         caption: "Arbeitszeit".to_owned(),
                         unit: "h".to_owned(),
+                        col_type: ColumnType::Number,
                     },
                 ],
 
