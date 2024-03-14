@@ -481,24 +481,24 @@ impl eframe::App for TreeTablesApp {
                     ui.end_row();
                 });
 
-                if ui.button("OK").clicked() {
-                    self.edit_column_idx = None;
-                }
+                ui.horizontal(|ui| {
+                    if ui.button("OK").clicked() {
+                        self.edit_column_idx = None;
+                    }
+                    ui.add_space(200.0);
+                    if ui
+                        .button(RichText::new("🗑").color(egui::Color32::RED))
+                        .clicked()
+                    {
+                        self.tree_table
+                            .column_configs
+                            .remove(self.edit_column_idx.unwrap());
 
-                if ui
-                    .button(RichText::new("🗑").color(egui::Color32::RED))
-                    .clicked()
-                {
-                    // dbg!(&self.tree_table.column_configs);
+                        // dbg!(&self.tree_table.column_configs);
 
-                    self.tree_table
-                        .column_configs
-                        .remove(self.edit_column_idx.unwrap());
-
-                    // dbg!(&self.tree_table.column_configs);
-
-                    self.edit_column_idx = None;
-                }
+                        self.edit_column_idx = None;
+                    }
+                });
             });
         }
     }
