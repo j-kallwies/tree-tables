@@ -41,14 +41,33 @@ fn format_float(mut x: f64, unit: Option<&str>, show_decimal: bool) -> String {
     }
 }
 
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Clone, Debug)]
 pub enum ColumnType {
+    // A column with simple floating point numbers
     Number,
+
+    // A column with plain text
     Text,
-    Formula,
+
+    // Multiply the number from the given column by the given factor
+    MultiplyByFactor(ColumnID, f64),
+
+    // Sum up the values of the given columns
+    RowSum(Vec<ColumnID>),
 }
 
-#[derive(serde::Deserialize, serde::Serialize, Debug)]
+impl ColumnType {
+    fn is_editable(&self) -> bool {
+        match self {
+            ColumnType::Number => true,
+            ColumnType::Text => true,
+            ColumnType::MultiplyByFactor(_, _) => false,
+            ColumnType::RowSum(_) => false,
+        }
+    }
+}
+
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
 pub struct ColumnConfig {
     id: String,
@@ -87,8 +106,22 @@ impl RowData {
 
             if !self.children.is_empty() {
                 let mut sum = 0.0;
-                for child in self.children.iter() {
-                    sum += child.col_data.get(col_id).unwrap_or(&0.0);
+                for child in self.children.iter_mut() {
+                    match &col_cfg.col_type {
+                        ColumnType::Number => sum += child.col_data.get(col_id).unwrap_or(&0.0),
+                        ColumnType::Text => (),
+                        ColumnType::MultiplyByFactor(input_col_id, factor) => {
+                            let value = child.col_data.get(input_col_id).unwrap_or(&0.0) * factor;
+                            // 1. Update the sum
+                            sum += value;
+
+                            // 2. Update the value itself
+                            child.col_data.insert(col_id.clone(), value);
+                        }
+                        ColumnType::RowSum(_) => {
+                            todo!("Pleas implement the RowSum function!")
+                        }
+                    }
                 }
                 self.col_data.insert(col_id.clone(), sum);
             }
@@ -132,7 +165,10 @@ impl RowData {
             }
 
             ui.add_space(10.0 * indent_level as f32);
-            if leaf_node {
+
+            let editable = leaf_node && col_cfg.col_type.is_editable();
+
+            if editable {
                 if ui
                     .add(
                         egui::DragValue::new(self.col_data.get_mut(col_id).unwrap())
@@ -549,6 +585,12 @@ impl eframe::App for TreeTablesApp {
 
         if self.edit_column_idx.is_some() {
             egui::Window::new("Edit column").show(ctx, |ui| {
+                let column_configs = self.tree_table.column_configs.clone();
+                let current_column_id = &column_configs
+                    .get(self.edit_column_idx.unwrap())
+                    .unwrap()
+                    .id;
+
                 egui::Grid::new("edit_column_table").show(ui, |ui| {
                     // ui.label("ID");
                     // ui.add_sized(
@@ -564,7 +606,71 @@ impl eframe::App for TreeTablesApp {
                     // );
                     // ui.end_row();
 
-                    ui.label("Title");
+                    ui.label("Type:");
+                    ui.horizontal(|ui| {
+                        if ui
+                            .selectable_label(
+                                self.tree_table
+                                    .column_configs
+                                    .get_mut(self.edit_column_idx.unwrap())
+                                    .unwrap()
+                                    .col_type
+                                    == ColumnType::Number,
+                                "Number",
+                            )
+                            .clicked()
+                        {
+                            self.tree_table
+                                .column_configs
+                                .get_mut(self.edit_column_idx.unwrap())
+                                .unwrap()
+                                .col_type = ColumnType::Number;
+                        }
+                        if ui
+                            .selectable_label(
+                                self.tree_table
+                                    .column_configs
+                                    .get_mut(self.edit_column_idx.unwrap())
+                                    .unwrap()
+                                    .col_type
+                                    == ColumnType::Text,
+                                "Text",
+                            )
+                            .clicked()
+                        {
+                            self.tree_table
+                                .column_configs
+                                .get_mut(self.edit_column_idx.unwrap())
+                                .unwrap()
+                                .col_type = ColumnType::Text;
+                        }
+                        if ui
+                            .selectable_label(
+                                if let ColumnType::MultiplyByFactor(_id, _factor) = &self
+                                    .tree_table
+                                    .column_configs
+                                    .get_mut(self.edit_column_idx.unwrap())
+                                    .unwrap()
+                                    .col_type
+                                {
+                                    true
+                                } else {
+                                    false
+                                },
+                                "Multiply",
+                            )
+                            .clicked()
+                        {
+                            self.tree_table
+                                .column_configs
+                                .get_mut(self.edit_column_idx.unwrap())
+                                .unwrap()
+                                .col_type = ColumnType::MultiplyByFactor("".to_owned(), 100.0);
+                        }
+                    });
+                    ui.end_row();
+
+                    ui.label("Title:");
                     ui.add_sized(
                         [140.0, 20.0],
                         egui::TextEdit::singleline(
@@ -588,6 +694,42 @@ impl eframe::App for TreeTablesApp {
                             .unit,
                     );
                     ui.end_row();
+
+                    match &mut self
+                        .tree_table
+                        .column_configs
+                        .get_mut(self.edit_column_idx.unwrap())
+                        .unwrap()
+                        .col_type
+                    {
+                        ColumnType::Number => (),
+                        ColumnType::Text => (),
+                        ColumnType::MultiplyByFactor(input_col_id, factor) => {
+                            ui.label("Input Column:");
+                            ui.horizontal(|ui| {
+                                for col_cfg in column_configs.iter() {
+                                    if *current_column_id != col_cfg.id {
+                                        if ui
+                                            .selectable_label(
+                                                col_cfg.id == *input_col_id,
+                                                col_cfg.caption.clone(),
+                                            )
+                                            .clicked()
+                                        {
+                                            *input_col_id = col_cfg.id.clone();
+                                        }
+                                    }
+                                }
+                            });
+
+                            ui.end_row();
+
+                            ui.label("Factor:");
+                            ui.add(egui::DragValue::new(factor));
+                            ui.end_row();
+                        }
+                        ColumnType::RowSum(_ref_col_ids) => (),
+                    }
                 });
 
                 ui.horizontal(|ui| {
