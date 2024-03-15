@@ -7,7 +7,7 @@ use std::vec::Vec;
 use uuid::Uuid;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
-const VALID_FILE_EXTENSIONS: [&'static str; 3] = ["tt", "json", "ttree"];
+const VALID_FILE_EXTENSIONS: [&'static str; 3] = ["tt", "json", "ttable"];
 
 fn format_float(mut x: f64, unit: Option<&str>, show_decimal: bool) -> String {
     if show_decimal == false {
@@ -84,15 +84,38 @@ enum Action {
 }
 
 #[derive(serde::Deserialize, serde::Serialize)]
+pub enum DataElement {
+    Number(f32),
+    String(String),
+}
+
+#[derive(serde::Deserialize, serde::Serialize)]
+#[serde(default)] // if we add new fields, give them default values when deserializing old state
 pub struct RowData {
     name: String,
 
+    // data_elements: HashMap<ColumnID, DataElement>,
     col_data: HashMap<ColumnID, f64>,
     children: Vec<RowData>,
+
+    enabled: bool,
 
     // UI State
     expanded: bool,
     edit_name: bool,
+}
+
+impl Default for RowData {
+    fn default() -> Self {
+        Self {
+            name: "".to_owned(),
+            col_data: HashMap::new(),
+            children: vec![],
+            edit_name: false,
+            expanded: true,
+            enabled: true,
+        }
+    }
 }
 
 impl RowData {
@@ -110,12 +133,18 @@ impl RowData {
                 let mut sum = 0.0;
                 for child in self.children.iter_mut() {
                     match &col_cfg.col_type {
-                        ColumnType::Number => sum += child.col_data.get(col_id).unwrap_or(&0.0),
+                        ColumnType::Number => {
+                            if child.enabled {
+                                sum += child.col_data.get(col_id).unwrap_or(&0.0);
+                            }
+                        }
                         ColumnType::Text => (),
                         ColumnType::MultiplyByFactor(input_col_id, factor) => {
                             let value = child.col_data.get(input_col_id).unwrap_or(&0.0) * factor;
                             // 1. Update the sum
-                            sum += value;
+                            if child.enabled {
+                                sum += value;
+                            }
 
                             // 2. Update the value itself
                             child.col_data.insert(col_id.clone(), value);
@@ -135,6 +164,7 @@ impl RowData {
         ui: &mut Ui,
         column_configs: &Vec<ColumnConfig>,
         indent_level: i32,
+        parent_enabled: bool,
         show_decimals: bool,
     ) -> Option<Action> {
         let mut action = None;
@@ -142,6 +172,9 @@ impl RowData {
         ui.horizontal(|ui| {
             ui.add_space(10.0 * indent_level as f32);
             ui.expand_button(&mut self.expanded);
+            if indent_level > 0 {
+                ui.checkbox(&mut self.enabled, "");
+            }
             if self.edit_name {
                 if ui.text_edit_singleline(&mut self.name).lost_focus() {
                     if !self.name.is_empty() {
@@ -172,7 +205,8 @@ impl RowData {
 
             if editable {
                 if ui
-                    .add(
+                    .add_enabled(
+                        self.enabled && parent_enabled,
                         egui::DragValue::new(self.col_data.get_mut(col_id).unwrap())
                             .speed(1.0)
                             .suffix(format!(" {unit}"))
@@ -204,7 +238,13 @@ impl RowData {
         if self.expanded {
             let mut remove_idx = None;
             for (i, child) in self.children.iter_mut().enumerate() {
-                match child.render(ui, column_configs, indent_level + 1, show_decimals) {
+                match child.render(
+                    ui,
+                    column_configs,
+                    indent_level + 1,
+                    self.enabled,
+                    show_decimals,
+                ) {
                     Some(Action::Remove) => remove_idx = Some(i),
                     Some(Action::Modified) => action = Some(Action::Modified),
                     None => (),
@@ -239,6 +279,7 @@ impl RowData {
                         children: vec![],
                         expanded: false,
                         edit_name: true,
+                        enabled: true,
                     });
 
                     action = Some(Action::Modified);
@@ -327,6 +368,15 @@ impl Default for TreeTablesApp {
                         unit: "h".to_owned(),
                         col_type: ColumnType::Number,
                     },
+                    ColumnConfig {
+                        id: "5aafbaab-6c03-4e8f-9fc4-cfb66ed2fb16".to_owned(), // Uuid::new_v4().to_string(),
+                        caption: "Verkaufspreis".to_owned(),
+                        unit: "€".to_owned(),
+                        col_type: ColumnType::MultiplyByFactor(
+                            "2387c84a-2c68-405e-a342-d94a1dde6408".to_owned(),
+                            100.0,
+                        ),
+                    },
                 ],
 
                 root_row: RowData {
@@ -334,13 +384,18 @@ impl Default for TreeTablesApp {
                     col_data: HashMap::from([]),
                     children: vec![RowData {
                         name: "A".to_owned(),
-                        col_data: HashMap::from([]),
+                        col_data: HashMap::from([(
+                            "2387c84a-2c68-405e-a342-d94a1dde6408".to_owned(),
+                            1.0,
+                        )]),
                         children: vec![],
                         expanded: false,
                         edit_name: false,
+                        enabled: true,
                     }],
                     expanded: false,
                     edit_name: false,
+                    enabled: true,
                 },
             },
             edit_title_text: false,
@@ -562,6 +617,7 @@ impl eframe::App for TreeTablesApp {
                         ui,
                         &self.tree_table.column_configs,
                         0,
+                        true,
                         self.show_decimals,
                     ) {
                         Some(Action::Modified) => {
@@ -686,7 +742,7 @@ impl eframe::App for TreeTablesApp {
                     );
                     ui.end_row();
 
-                    ui.label("Unit");
+                    ui.label("Unit:");
                     ui.text_edit_singleline(
                         &mut self
                             .tree_table
