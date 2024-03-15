@@ -41,6 +41,8 @@ fn format_float(mut x: f64, unit: Option<&str>, show_decimal: bool) -> String {
     }
 }
 
+use String as ColumnID;
+
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Clone, Debug)]
 pub enum ColumnType {
     // A column with simple floating point numbers
@@ -70,7 +72,7 @@ impl ColumnType {
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
 pub struct ColumnConfig {
-    id: String,
+    id: ColumnID,
     caption: String,
     unit: String,
     col_type: ColumnType,
@@ -85,7 +87,7 @@ enum Action {
 pub struct RowData {
     name: String,
 
-    col_data: HashMap<String, f64>,
+    col_data: HashMap<ColumnID, f64>,
     children: Vec<RowData>,
 
     // UI State
