@@ -100,6 +100,8 @@ pub struct RowData {
 
     enabled: bool,
 
+    multiplier: f64,
+
     // UI State
     expanded: bool,
     edit_name: bool,
@@ -114,6 +116,7 @@ impl Default for RowData {
             edit_name: false,
             expanded: true,
             enabled: true,
+            multiplier: 1.0,
         }
     }
 }
@@ -135,7 +138,8 @@ impl RowData {
                     match &col_cfg.col_type {
                         ColumnType::Number => {
                             if child.enabled {
-                                sum += child.col_data.get(col_id).unwrap_or(&0.0);
+                                sum +=
+                                    child.multiplier * child.col_data.get(col_id).unwrap_or(&0.0);
                             }
                         }
                         ColumnType::Text => (),
@@ -174,6 +178,26 @@ impl RowData {
             ui.expand_button(&mut self.expanded);
             if indent_level > 0 {
                 ui.checkbox(&mut self.enabled, "");
+
+                if ui
+                    .add_enabled(
+                        self.enabled && parent_enabled,
+                        egui::DragValue::new(&mut self.multiplier)
+                            .speed(1.0)
+                            .suffix("x")
+                            .custom_formatter(|n, _| format_float(n, None, show_decimals))
+                            .custom_parser(|s| {
+                                let s_cleaned = String::from(s).replace(".", "").replace(",", ".");
+                                return match s_cleaned.parse::<f64>() {
+                                    Ok(x) => Some(x),
+                                    Err(_) => None,
+                                };
+                            }),
+                    )
+                    .changed()
+                {
+                    action = Some(Action::Modified);
+                }
             }
             if self.edit_name {
                 if ui.text_edit_singleline(&mut self.name).lost_focus() {
@@ -280,6 +304,7 @@ impl RowData {
                         expanded: false,
                         edit_name: true,
                         enabled: true,
+                        multiplier: 1.0,
                     });
 
                     action = Some(Action::Modified);
@@ -392,10 +417,12 @@ impl Default for TreeTablesApp {
                         expanded: false,
                         edit_name: false,
                         enabled: true,
+                        multiplier: 1.0,
                     }],
                     expanded: false,
                     edit_name: false,
                     enabled: true,
+                    multiplier: 1.0,
                 },
             },
             edit_title_text: false,
